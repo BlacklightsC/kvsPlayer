@@ -3,6 +3,8 @@ using System.Numerics;
 using NAudio.Vorbis;
 using NAudio.Wave;
 
+using NVorbis;
+
 namespace kvsPlayer
 {
     public partial class MainForm : Form
@@ -42,7 +44,7 @@ namespace kvsPlayer
                 try
                 {
                     string path = files[0];
-                    if (player.PlaybackState == PlaybackState.Playing)
+                    if (player.PlaybackState != PlaybackState.Stopped)
                     {
                         timer1.Stop();
                         player.Stop();
@@ -52,14 +54,14 @@ namespace kvsPlayer
                     filePathView.Text = Path.GetFileNameWithoutExtension(path);
                     kvs = new KvsFile(path);
                     reader = new LoopStream(new VorbisWaveReader(kvs.OggFile)) { LoopPoint = kvs.Looptime };
-                    if (kvs.Looptime.Ticks == 0)
+                    if (kvs.Loopable)
                     {
-                        reader.EnableLooping = false;
-                        LoopState.Text = "No Loop";
+                        LoopState.Text = $"{kvs.Looptime} ~ {reader.TotalTime}";
                     }
                     else
                     {
-                        LoopState.Text = $"{kvs.Looptime} ~ {reader.TotalTime}";
+                        reader.EnableLooping = false;
+                        LoopState.Text = "No Loop";
                     }
                     trackBar1.Maximum = (int)reader.TotalTime.TotalMilliseconds;
                     trackBar1.Value = 0;

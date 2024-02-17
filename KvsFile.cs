@@ -10,22 +10,38 @@ namespace kvsPlayer
         {
             int i;
             using var kvs = File.OpenRead(FilePath);
-            byte[] buf = new byte[16];
-            kvs.Read(buf, 0, 16);
-            if (buf[0] != 'K' || buf[1] != 'O' || buf[2] != 'V' || buf[3] != 'S') throw new InvalidDataException("Magic number must be KOVS");
+            byte[] buf = new byte[32];
+            kvs.Read(buf, 0, 32);
+            if (BitConverter.ToInt32(buf, 0) != 0x53564F4B) throw new InvalidDataException("Magic number must be 'KOVS'");
             int ogg_size = BitConverter.ToInt32(buf, 4);
             if (ogg_size < 0xFF) throw new InvalidDataException("ogg_size must be bigger then 255bytes");
             double loop_point = BitConverter.ToInt32(buf, 8);
+            Loopable = buf[0x10] == 0;
             kvs.Seek(0x20, SeekOrigin.Begin);
             OggFile = new MemoryStream(ogg_size);
             for (i = 0; i <= 0xFF; i++)
                 OggFile.WriteByte((byte)(kvs.ReadByte() ^ i));
-            while ((i = kvs.Read(buf, 0, 16)) > 0)
-                OggFile.Write(buf, 0, i);
+            int len = 0;
+            while ((i = kvs.Read(buf, 0, 32)) > 0)
+            {
+                if (len + i < ogg_size)
+                {
+                    len += i;
+                    OggFile.Write(buf, 0, i);
+                }
+                else
+                {
+                    OggFile.Write(buf, 0, ogg_size - len);
+                    len = ogg_size;
+                    break;
+                }
+            }
             using var vr = new VorbisReader(OggFile, false);
             Looptime = TimeSpan.FromSeconds(loop_point / vr.SampleRate);
         }
         public TimeSpan Looptime { get; set; }
+
+        public bool Loopable { get; set; }
 
         public MemoryStream OggFile { get; private set; }
 
